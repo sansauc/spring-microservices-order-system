@@ -1,0 +1,131 @@
+server:
+  port: 8082
+
+spring:
+  cloud:
+    discovery:
+      enabled: true
+    openfeign:
+      client:
+        config:
+          default:
+            dismiss404: true
+            connectTimeout: 2000   # How long OpenFeign waits to establish a connection with the target microservice.
+            readTimeout: 3000      # How long OpenFeign waits to receive data from the microservice once connected.
+          service-product:
+            readTimeout: 2000      # Overrides the default for that particular microservice
+          service-customer:
+            readTimeout: 3000
+      circuitbreaker:
+        enabled: false # Disables Feign's own breakers, since they clutter /actuator/breaker
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  health:
+    circuitbreakers:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        # Only what is included here is exposed over HTTP.
+        include: health,refresh, circuitbreakers,retries, retryevents, bulkheads, bulkheadevents, ratelimiters, ratelimiterevents
+  endpoint:
+    health:
+      show-details: always
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      service-customer:
+        registerHealthIndicator: true
+        eventConsumerBufferSize: 10
+        failureRateThreshold: 50
+        minimumNumberOfCalls: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        slidingWindowType: COUNT_BASED
+        # 4xx are business errors (e.g. 409 insufficient stock), not service outages
+        ignoreExceptions:
+          - feign.FeignException$FeignClientException
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+      service-product:
+        registerHealthIndicator: true
+        eventConsumerBufferSize: 10
+        failureRateThreshold: 50
+        minimumNumberOfCalls: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        slidingWindowType: COUNT_BASED
+        # 4xx are business errors (e.g. 409 insufficient stock), not service outages
+        ignoreExceptions:
+          - feign.FeignException$FeignClientException
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+  retry:
+    instances:
+      service-customer:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true #Espera inicial entre reintentos
+        exponentialBackoffMultiplier: 2 # Factor by which the wait time is multiplied: 500ms, then 1s, then 2s, and so on
+        exponentialMaxWaitDuration: 5s # Upper limit for the wait time
+        ignoreExceptions: # Exceptions that must NOT be retried
+          - feign.FeignException$FeignClientException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+      service-product:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        exponentialMaxWaitDuration: 5s
+        ignoreExceptions:
+          - feign.FeignException$FeignClientException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+      service-product-write:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        exponentialMaxWaitDuration: 5s
+        ignoreExceptions:
+          - feign.FeignException$FeignClientException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+  bulkhead:
+    instances:
+      service-customer:
+        maxConcurrentCalls: 20       # allowed concurrent calls
+        maxWaitDuration: 0          # 0 = if there is no room, reject immediately
+      service-product:
+        maxConcurrentCalls: 20
+        maxWaitDuration: 0
+      service-product-write:
+        maxConcurrentCalls: 10       # writes usually need less capacity
+        maxWaitDuration: 0
+  ratelimiter:
+    instances:
+      create-order:
+        limitForPeriod: 20             # permits per period
+        limitRefreshPeriod: 10s       # how often they are renewed
+        timeoutDuration: 0            # 0 = if there is no permit, reject immediately
+        registerHealthIndicator: false
+        eventConsumerBufferSize: 50
+        subscribeForEvents: true
+      read-orders:
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+        eventConsumerBufferSize: 50
+        subscribeForEvents: true

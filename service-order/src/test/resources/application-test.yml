@@ -1,0 +1,61 @@
+eureka:
+  client:
+    enabled: false
+
+spring:
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            dismiss404: true
+            connectTimeout: 500
+            readTimeout: 300
+      circuitbreaker:
+        enabled: false
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      service-customer:
+        failureRateThreshold: 50
+        minimumNumberOfCalls: 5
+        slidingWindowSize: 10
+        slidingWindowType: COUNT_BASED
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - feign.FeignException$FeignClientException
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+      service-product:
+        failureRateThreshold: 50
+        minimumNumberOfCalls: 5
+        slidingWindowSize: 10
+        slidingWindowType: COUNT_BASED
+        waitDurationInOpenState: 5s
+        permittedNumberOfCallsInHalfOpenState: 3
+        ignoreExceptions:
+          - feign.FeignException$FeignClientException
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+  retry:
+    instances:
+      service-customer: &retry
+        maxAttempts: 3
+        waitDuration: 10ms
+        ignoreExceptions:
+          - feign.FeignException$FeignClientException
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+      service-product: *retry
+      service-product-write: *retry # YAML alias to avoid repeating the same block three times
+  bulkhead:
+    instances:
+      service-customer:
+        maxConcurrentCalls: 20
+        maxWaitDuration: 0
+      service-product:
+        maxConcurrentCalls: 20
+        maxWaitDuration: 0
+      service-product-write:
+        maxConcurrentCalls: 10
+        maxWaitDuration: 0

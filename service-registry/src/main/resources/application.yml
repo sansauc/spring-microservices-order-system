@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: service-registry
+
+server:
+  port: 8761
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    serviceUrl:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    # Development only: always responds with the up-to-date registry
+    # (by default it uses a read cache refreshed every 30s)
+    use-read-only-response-cache: false
